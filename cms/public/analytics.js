@@ -51,54 +51,9 @@
     return os;
   }
   
-  // Parse referrer source
-  function getReferrerSource(referrer) {
-    if (!referrer) return 'direct';
-    
-    const url = referrer.toLowerCase();
-    
-    // Social media platforms
-    if (url.includes('twitter.com') || url.includes('t.co') || url.includes('x.com')) return 'twitter';
-    if (url.includes('facebook.com') || url.includes('fb.com') || url.includes('m.facebook.com')) return 'facebook';
-    if (url.includes('linkedin.com') || url.includes('lnkd.in')) return 'linkedin';
-    if (url.includes('reddit.com') || url.includes('redd.it')) return 'reddit';
-    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-    if (url.includes('instagram.com')) return 'instagram';
-    if (url.includes('tiktok.com')) return 'tiktok';
-    if (url.includes('pinterest.com') || url.includes('pin.it')) return 'pinterest';
-    if (url.includes('tumblr.com')) return 'tumblr';
-    if (url.includes('discord.com') || url.includes('discord.gg')) return 'discord';
-    if (url.includes('slack.com')) return 'slack';
-    if (url.includes('telegram.org') || url.includes('t.me')) return 'telegram';
-    if (url.includes('whatsapp.com') || url.includes('wa.me')) return 'whatsapp';
-    if (url.includes('news.ycombinator.com') || url.includes('hackernews')) return 'hackernews';
-    
-    // Search engines
-    if (url.includes('google.com') || url.includes('google.') || url.includes('googleapis.com')) return 'google';
-    if (url.includes('bing.com')) return 'bing';
-    if (url.includes('duckduckgo.com')) return 'duckduckgo';
-    if (url.includes('baidu.com')) return 'baidu';
-    if (url.includes('yandex.')) return 'yandex';
-    
-    // Email clients
-    if (url.includes('mail.google.com') || url.includes('gmail.com')) return 'gmail';
-    if (url.includes('outlook.com') || url.includes('outlook.live.com')) return 'outlook';
-    if (url.includes('mail.yahoo.com')) return 'yahoo-mail';
-    
-    // Check if it's from the same domain
-    const currentDomain = window.location.hostname;
-    try {
-      const referrerUrl = new URL(referrer);
-      if (referrerUrl.hostname === currentDomain || referrerUrl.hostname === 'www.' + currentDomain) {
-        return 'internal';
-      }
-    } catch (e) {
-      // Invalid URL, continue
-    }
-    
-    return 'external';
-  }
-  
+  // Note: Source classification moved to server-side classifySource() function
+  // Server has more comprehensive classification and access to raw referrer
+
   // Get UTM parameters from URL
   function getUTMParams() {
     const params = new URLSearchParams(window.location.search);
@@ -123,7 +78,7 @@
     url: window.location.href,
     title: document.title,
     referrer: document.referrer,
-    referrerSource: getReferrerSource(document.referrer),
+    // Server handles source classification based on raw referrer
     utmParams: getUTMParams(),
     screenWidth: window.screen.width,
     screenHeight: window.screen.height,
@@ -187,8 +142,7 @@
       page: {
         url: pageData.url,
         title: pageData.title,
-        referrer: pageData.referrer,
-        referrerSource: pageData.referrerSource
+        referrer: pageData.referrer
       },
       device: {
         browser: pageData.browser,
@@ -451,13 +405,8 @@
         pageData.title = document.title;
         // Use our tracked previous URL for internal navigation, otherwise use document.referrer
         pageData.referrer = previousUrl || document.referrer;
-        // For internal navigation, always set source as 'internal'
-        if (previousUrl && previousUrl.includes(window.location.hostname)) {
-          pageData.referrerSource = 'internal';
-        } else {
-          pageData.referrerSource = getReferrerSource(pageData.referrer);
-        }
-        
+        // Server handles source classification based on raw referrer
+
         console.log('ULT Analytics: Captured title:', pageData.title);
         
         // Send new page view
