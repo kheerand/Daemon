@@ -51,7 +51,7 @@ export function Nav() {
             <span className="hidden sm:inline">TELOS</span>
           </a>
           <a
-            href="https://mcp.daemon.danielmiessler.com"
+            href="https://daemon.kheerand.id.au"
             target="_blank"
             rel="noopener noreferrer"
             className="px-4 py-2 rounded-lg font-heading font-medium text-sm bg-brand/20 hover:bg-brand/30 text-brand border border-brand/30 transition-all duration-300"

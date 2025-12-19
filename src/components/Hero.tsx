@@ -8,22 +8,14 @@ export function Hero() {
   useEffect(() => {
     async function fetchLocation() {
       try {
-        const response = await fetch('https://mcp.daemon.danielmiessler.com', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'tools/call',
-            params: { name: 'get_current_location', arguments: {} },
-            id: 1
-          })
-        });
-        const data = await response.json();
-        if (data.result?.content?.[0]?.text) {
-          setLocation(data.result.content[0].text);
+        const response = await fetch('/daemon.md');
+        const text = await response.text();
+        const match = text.match(/\[CURRENT_LOCATION\]\s*\n\s*(.+)/);
+        if (match) {
+          setLocation(match[1].trim());
         }
       } catch {
-        setLocation('Bay Area');
+        setLocation('Melbourne, Australia');
       }
     }
     fetchLocation();
@@ -55,8 +47,8 @@ export function Hero() {
           className="font-heading text-lg text-text-secondary mb-3"
         >
           Personal MCP API for{' '}
-          <a href="https://danielmiessler.com" className="text-brand hover:underline">
-            Daniel Miessler
+          <a href="https://cytrax.com.au" className="text-brand hover:underline">
+            Kheeran Dharmawardena
           </a>
         </motion.p>
 

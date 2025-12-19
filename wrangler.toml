@@ -1,18 +1,15 @@
 name = "daemon"
 main = "src/worker.ts"
 compatibility_date = "2025-08-20"
-workers_dev = true
-
-[observability]
-enabled = false
-
-[observability.logs]
-enabled = false
+workers_dev = false
 
 # Custom domain route
 routes = [
-  { pattern = "daemon.danielmiessler.com", custom_domain = true }
+  { pattern = "daemon.kheerand.id.au", custom_domain = true }
 ]
 
 [site]
 bucket = "./dist"
+
+[observability]
+enabled = false

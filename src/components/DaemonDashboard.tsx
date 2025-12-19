@@ -133,7 +133,7 @@ function StatusBar({
       className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border-default bg-bg-secondary/80 backdrop-blur-sm px-4 py-3 mb-6"
     >
       <div className="flex items-center gap-4">
-        <span className="font-mono font-bold text-sm text-accent">DAEMON://MIESSLER</span>
+        <span className="font-mono font-bold text-sm text-accent">DAEMON://KHEERAN</span>
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success animate-pulse-slow' : 'bg-error'}`} />
           <span className="font-mono text-xs text-text-secondary">
@@ -169,7 +169,7 @@ export function DaemonDashboard() {
     setError(null);
 
     try {
-      const toolsResponse = await fetch('https://mcp.daemon.danielmiessler.com', {
+      const toolsResponse = await fetch('https://daemon.kheerand.id.au', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', method: 'tools/list', id: 1 })
@@ -180,7 +180,7 @@ export function DaemonDashboard() {
         setToolCount(toolsData.result?.tools?.length || 0);
       }
 
-      const dataResponse = await fetch('https://mcp.daemon.danielmiessler.com', {
+      const dataResponse = await fetch('https://daemon.kheerand.id.au', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -492,7 +492,7 @@ export function DaemonDashboard() {
             <Server className="w-5 h-5 text-text-tertiary" />
             <span className="font-mono text-sm font-semibold tracking-wider text-text-tertiary uppercase">API Access</span>
           </div>
-          <code className="font-mono text-base text-brand block mb-3">mcp.daemon.danielmiessler.com</code>
+          <code className="font-mono text-base text-brand block mb-3">daemon.kheerand.id.au</code>
           <p className="text-sm text-text-tertiary mb-4">Connect your AI assistant directly</p>
           <a
             href="/api/"
