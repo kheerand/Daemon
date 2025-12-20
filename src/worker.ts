@@ -48,6 +48,83 @@ function parseDaemonData(content: string): Record<string, string> {
   return sections;
 }
 
+// Sections that should be parsed as arrays (markdown lists)
+const LIST_SECTIONS = [
+  'favorite_books',
+  'favorite_movies',
+  'favorite_podcasts',
+  'predictions',
+  'preferences',
+  'daily_routine',
+];
+
+// Parse markdown list into array
+function parseMarkdownList(content: string): string[] {
+  if (!content) return [];
+  return content
+    .split('\n')
+    .filter(line => line.trim().startsWith('-'))
+    .map(line => line.replace(/^-\s*/, '').trim())
+    .filter(Boolean);
+}
+
+// Parse telos section - extract P/M/G items
+function parseTelosItems(content: string): string[] {
+  if (!content) return [];
+  return content
+    .split('\n')
+    .filter(line => /^-\s*[PMG]\d+:/.test(line.trim()))
+    .map(line => line.replace(/^-\s*/, '').trim())
+    .filter(Boolean);
+}
+
+// Parse structured data for dashboard consumption
+function parseStructuredData(sections: Record<string, string>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(sections)) {
+    if (LIST_SECTIONS.includes(key)) {
+      result[key] = parseMarkdownList(value);
+    } else if (key === 'telos') {
+      // Parse telos to extract P/M/G items as array
+      result[key] = parseTelosItems(value);
+    } else if (key === 'projects') {
+      // Parse projects into categories
+      const projects: { technical?: string[]; creative?: string[]; personal?: string[] } = {};
+      const lines = value.split('\n');
+      let currentCategory: 'technical' | 'creative' | 'personal' | null = null;
+
+      for (const line of lines) {
+        const trimmed = line.trim().toLowerCase();
+        if (trimmed.includes('technical')) {
+          currentCategory = 'technical';
+          projects.technical = [];
+        } else if (trimmed.includes('creative')) {
+          currentCategory = 'creative';
+          projects.creative = [];
+        } else if (trimmed.includes('personal')) {
+          currentCategory = 'personal';
+          projects.personal = [];
+        } else if (currentCategory && line.trim().startsWith('-')) {
+          const item = line.replace(/^-\s*/, '').trim();
+          if (item) projects[currentCategory]?.push(item);
+        }
+      }
+
+      // If no categories found, treat all as technical
+      if (!projects.technical && !projects.creative && !projects.personal) {
+        projects.technical = parseMarkdownList(value);
+      }
+
+      result[key] = projects;
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
 // Map tool names to section names
 const toolToSection: Record<string, string> = {
   get_about: 'about',
@@ -149,7 +226,8 @@ async function handleMcpRequest(
       let result: string;
 
       if (toolName === 'get_all') {
-        result = JSON.stringify(sections, null, 2);
+        const structuredData = parseStructuredData(sections);
+        result = JSON.stringify(structuredData, null, 2);
       } else if (toolName === 'get_section') {
         const sectionName = (args.section as string)?.toLowerCase();
         if (!sectionName) {
