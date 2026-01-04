@@ -7,7 +7,9 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "bun run build:daemon-data && astro build",
+    "build:daemon-data": "bun scripts/build-daemon-data.ts",
+    "validate": "bun scripts/validate-daemon-data.ts",
     "preview": "astro preview"
   },
   "dependencies": {

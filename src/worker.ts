@@ -3,23 +3,42 @@ import manifestJSON from '__STATIC_CONTENT_MANIFEST';
 
 const assetManifest = JSON.parse(manifestJSON);
 
+// Access level types
+type AccessLevel = 'public' | 'restricted' | 'private';
+
+interface ContentBlock {
+  content: string;
+  accessLevel: AccessLevel | 'inherited';
+}
+
+interface ParsedSection {
+  name: string;
+  defaultAccessLevel?: AccessLevel;
+  content: ContentBlock[];
+}
+
 // MCP Tool definitions
 const TOOLS = [
-  { name: 'get_about', description: "Get Kheeran's about/bio information" },
-  { name: 'get_narrative', description: "Get Kheeran's current personal narrative" },
-  { name: 'get_mission', description: "Get Kheeran's mission statement" },
-  { name: 'get_projects', description: "Get Kheeran's current projects" },
-  { name: 'get_telos', description: "Get Kheeran's telos (ultimate goals/purpose)" },
-  { name: 'get_favorite_books', description: "Get Kheeran's favorite books" },
-  { name: 'get_favorite_movies', description: "Get Kheeran's favorite movies" },
-  { name: 'get_current_location', description: "Get Kheeran's current location" },
-  { name: 'get_preferences', description: "Get Kheeran's preferences and interests" },
-  { name: 'get_daily_routine', description: "Get Kheeran's daily routine" },
-  { name: 'get_predictions', description: "Get Kheeran's predictions about AI and the future" },
-  { name: 'get_all', description: 'Get all daemon information' },
+  { name: 'get_about', description: "Get Kheeran's about/bio information", accessLevel: 'public' as AccessLevel },
+  { name: 'get_narrative', description: "Get Kheeran's current personal narrative", accessLevel: 'restricted' as AccessLevel },
+  { name: 'get_mission', description: "Get Kheeran's mission statement", accessLevel: 'public' as AccessLevel },
+  { name: 'get_projects', description: "Get Kheeran's current projects", accessLevel: 'restricted' as AccessLevel },
+  { name: 'get_telos', description: "Get Kheeran's telos (ultimate goals/purpose)", accessLevel: 'restricted' as AccessLevel },
+  { name: 'get_favorite_books', description: "Get Kheeran's favorite books", accessLevel: 'public' as AccessLevel },
+  { name: 'get_favorite_movies', description: "Get Kheeran's favorite movies", accessLevel: 'public' as AccessLevel },
+  { name: 'get_current_location', description: "Get Kheeran's current location", accessLevel: 'public' as AccessLevel },
+  { name: 'get_preferences', description: "Get Kheeran's preferences and interests", accessLevel: 'restricted' as AccessLevel },
+  { name: 'get_daily_routine', description: "Get Kheeran's daily routine", accessLevel: 'restricted' as AccessLevel },
+  { name: 'get_predictions', description: "Get Kheeran's predictions about AI and the future", accessLevel: 'restricted' as AccessLevel },
+  { name: 'get_favorite_podcasts', description: "Get Kheeran's favorite podcasts", accessLevel: 'public' as AccessLevel },
+  { name: 'get_personal_contacts', description: "Get Kheeran's contact information", accessLevel: 'private' as AccessLevel },
+  { name: 'get_family_details', description: "Get Kheeran's family information", accessLevel: 'private' as AccessLevel },
+  { name: 'get_mico_instructions', description: "Get Mico-specific instructions", accessLevel: 'private' as AccessLevel },
+  { name: 'get_all', description: 'Get all daemon information (filtered by access level)', accessLevel: 'public' as AccessLevel },
   {
     name: 'get_section',
     description: 'Get any section by name (e.g., favorite_podcasts, daily_routine)',
+    accessLevel: 'public' as AccessLevel,
     inputSchema: {
       type: 'object',
       properties: {
@@ -33,19 +52,179 @@ const TOOLS = [
   },
 ];
 
-// Parse daemon.md content into sections
-function parseDaemonData(content: string): Record<string, string> {
-  const sections: Record<string, string> = {};
-  const sectionRegex = /\[([A-Z_]+)\]\s*\n([\s\S]*?)(?=\n\[|$)/g;
+// Parse daemon data with access levels
+function parseDaemonDataWithAccess(content: string): Record<string, ParsedSection> {
+  const sections: Record<string, ParsedSection> = {};
+
+  // Parse sections: [SECTION_NAME] @level
+  const sectionRegex = /\[([A-Z_]+)\](?:\s*@(\w+))?\s*\n([\s\S]*?)(?=\n\[|$)/g;
   let match;
 
   while ((match = sectionRegex.exec(content)) !== null) {
     const sectionName = match[1].toLowerCase();
-    const sectionContent = match[2].trim();
-    sections[sectionName] = sectionContent;
+    const defaultAccessLevel = match[2] ? (match[2].toLowerCase() as AccessLevel) : 'public';
+    const sectionContent = match[3].trim();
+
+    // Parse content blocks within section
+    const contentBlocks = parseContentBlocks(sectionContent);
+
+    sections[sectionName] = {
+      name: sectionName,
+      defaultAccessLevel,
+      content: contentBlocks,
+    };
   }
 
   return sections;
+}
+
+// Parse content blocks: @level
+function parseContentBlocks(content: string): ContentBlock[] {
+  const blocks: ContentBlock[] = [];
+
+  // Split by access level markers (@public, @restricted, @private)
+  const parts = content.split(/\n@(public|restricted|private)\s*\n/);
+
+  // First part (before any @level marker) inherits section's default
+  if (parts.length > 0 && parts[0].trim()) {
+    blocks.push({
+      content: parts[0].trim(),
+      accessLevel: 'inherited',
+    });
+  }
+
+  // Parse explicit @level markers
+  for (let i = 1; i < parts.length; i += 2) {
+    if (i + 1 < parts.length) {
+      const accessLevel = parts[i] as AccessLevel;
+      const content = parts[i + 1].trim();
+
+      if (content) {
+        blocks.push({
+          content,
+          accessLevel,
+        });
+      }
+    }
+  }
+
+  return blocks;
+}
+
+// Check if user can access content at a given level
+function isAccessible(contentLevel: AccessLevel, userLevel: AccessLevel): boolean {
+  const levelOrder: AccessLevel[] = ['public', 'restricted', 'private'];
+  const contentIndex = levelOrder.indexOf(contentLevel);
+  const userIndex = levelOrder.indexOf(userLevel);
+
+  return userIndex >= contentIndex;
+}
+
+// Resolve content block's effective access level
+function resolveContentAccessLevel(
+  blockAccessLevel: AccessLevel | 'inherited',
+  sectionDefaultLevel: AccessLevel
+): AccessLevel {
+  if (blockAccessLevel === 'inherited') {
+    return sectionDefaultLevel;
+  }
+  return blockAccessLevel;
+}
+
+// Filter section content by access level
+function filterSectionContent(
+  section: ParsedSection,
+  userLevel: AccessLevel
+): string {
+  const accessibleBlocks: string[] = [];
+
+  for (const block of section.content) {
+    const effectiveLevel = resolveContentAccessLevel(
+      block.accessLevel,
+      section.defaultAccessLevel || 'public'
+    );
+
+    if (isAccessible(effectiveLevel, userLevel)) {
+      accessibleBlocks.push(block.content);
+    }
+  }
+
+  return accessibleBlocks.join('\n\n');
+}
+
+// Get user's access level from request
+function getAccessLevel(request: Request, env: any): AccessLevel {
+  const authHeader = request.headers.get('Authorization');
+
+  if (!authHeader) {
+    return 'public';
+  }
+
+  // Extract token from "Bearer <token>" format
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  // Check private token first (highest access)
+  if (env.PRIVATE_TOKEN && token === env.PRIVATE_TOKEN) {
+    return 'private';
+  }
+
+  // Check restricted token
+  if (env.RESTRICTED_TOKEN && token === env.RESTRICTED_TOKEN) {
+    return 'restricted';
+  }
+
+  // Invalid token = public access (no error, graceful degradation)
+  return 'public';
+}
+
+// Fetch daemon.md from static assets
+async function getDaemonContent(request: Request, env: any, ctx: any): Promise<string> {
+  const daemonUrl = new URL(request.url);
+  daemonUrl.pathname = '/daemon.md';
+
+  const daemonRequest = new Request(daemonUrl.toString(), {
+    method: 'GET',
+  });
+
+  try {
+    const response = await getAssetFromKV(
+      {
+        request: daemonRequest,
+        waitUntil: ctx.waitUntil.bind(ctx),
+      },
+      {
+        ASSET_NAMESPACE: env.__STATIC_CONTENT,
+        ASSET_MANIFEST: assetManifest,
+      }
+    );
+    return await response.text();
+  } catch {
+    return '';
+  }
+}
+
+// Load daemon data filtered by access level
+async function loadDaemonData(
+  accessLevel: AccessLevel,
+  request: Request,
+  env: any,
+  ctx: any
+): Promise<Record<string, string>> {
+  const content = await getDaemonContent(request, env, ctx);
+  const sections = parseDaemonDataWithAccess(content);
+
+  const filteredSections: Record<string, string> = {};
+
+  for (const [key, section] of Object.entries(sections)) {
+    const filteredContent = filterSectionContent(section, accessLevel);
+
+    // Only include section if it has accessible content
+    if (filteredContent.trim()) {
+      filteredSections[key] = filteredContent;
+    }
+  }
+
+  return filteredSections;
 }
 
 // Sections that should be parsed as arrays (markdown lists)
@@ -138,33 +317,11 @@ const toolToSection: Record<string, string> = {
   get_preferences: 'preferences',
   get_daily_routine: 'daily_routine',
   get_predictions: 'predictions',
+  get_favorite_podcasts: 'favorite_podcasts',
+  get_personal_contacts: 'personal_contacts',
+  get_family_details: 'family_details',
+  get_mico_instructions: 'mico_instructions',
 };
-
-// Fetch daemon.md from static assets
-async function getDaemonContent(request: Request, env: any, ctx: any): Promise<string> {
-  const daemonUrl = new URL(request.url);
-  daemonUrl.pathname = '/daemon.md';
-
-  const daemonRequest = new Request(daemonUrl.toString(), {
-    method: 'GET',
-  });
-
-  try {
-    const response = await getAssetFromKV(
-      {
-        request: daemonRequest,
-        waitUntil: ctx.waitUntil.bind(ctx),
-      },
-      {
-        ASSET_NAMESPACE: env.__STATIC_CONTENT,
-        ASSET_MANIFEST: assetManifest,
-      }
-    );
-    return await response.text();
-  } catch {
-    return '';
-  }
-}
 
 // Handle MCP JSON-RPC requests
 async function handleMcpRequest(
@@ -175,7 +332,7 @@ async function handleMcpRequest(
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 
   // Handle CORS preflight
@@ -197,12 +354,56 @@ async function handleMcpRequest(
       return jsonRpcError(-32600, 'Invalid Request', id, corsHeaders);
     }
 
-    // Handle tools/list
-    if (method === 'tools/list') {
+    // Handle initialize (required by MCP clients)
+    if (method === 'initialize') {
       return new Response(
         JSON.stringify({
           jsonrpc: '2.0',
-          result: { tools: TOOLS },
+          result: {
+            protocolVersion: '2024-11-05',
+            capabilities: {
+              tools: {},
+            },
+            serverInfo: {
+              name: 'daemon',
+              version: '2.0.0',
+            },
+          },
+          id,
+        }),
+        {
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    // Handle notifications/initialized (MCP client confirms initialization)
+    if (method === 'notifications/initialized') {
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          result: {},
+          id,
+        }),
+        {
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    // Get user's access level
+    const userAccessLevel = getAccessLevel(request, env);
+
+    // Handle tools/list - filter by access level
+    if (method === 'tools/list') {
+      const accessibleTools = TOOLS.filter(tool =>
+        isAccessible(tool.accessLevel || 'public', userAccessLevel)
+      );
+
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          result: { tools: accessibleTools },
           id,
         }),
         {
@@ -220,8 +421,23 @@ async function handleMcpRequest(
         return jsonRpcError(-32602, 'Invalid params: missing tool name', id, corsHeaders);
       }
 
-      const daemonContent = await getDaemonContent(request, env, ctx);
-      const sections = parseDaemonData(daemonContent);
+      // Check if tool exists and is accessible
+      const tool = TOOLS.find(t => t.name === toolName);
+      if (!tool) {
+        return jsonRpcError(-32601, `Unknown tool: ${toolName}`, id, corsHeaders);
+      }
+
+      if (!isAccessible(tool.accessLevel || 'public', userAccessLevel)) {
+        return jsonRpcError(
+          -32603,
+          `Access denied: ${toolName} requires ${tool.accessLevel} access`,
+          id,
+          corsHeaders
+        );
+      }
+
+      // Load data with access filtering
+      const sections = await loadDaemonData(userAccessLevel, request, env, ctx);
 
       let result: string;
 
@@ -233,10 +449,10 @@ async function handleMcpRequest(
         if (!sectionName) {
           return jsonRpcError(-32602, 'Invalid params: missing section name', id, corsHeaders);
         }
-        result = sections[sectionName] || `Section '${sectionName}' not found`;
+        result = sections[sectionName] || `Section '${sectionName}' not found or not accessible`;
       } else if (toolToSection[toolName]) {
         const sectionName = toolToSection[toolName];
-        result = sections[sectionName] || `Section '${sectionName}' not found`;
+        result = sections[sectionName] || `Section '${sectionName}' not found or not accessible`;
       } else {
         return jsonRpcError(-32601, `Unknown tool: ${toolName}`, id, corsHeaders);
       }
@@ -295,7 +511,7 @@ export default {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
       });
     }

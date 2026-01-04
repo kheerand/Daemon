@@ -32,3 +32,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# Daemon data (built from PKM at build time)
+# Source: ~/Dropbox/PKM/Databases/People/Kheeran.md
+public/daemon.md
